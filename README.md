@@ -29,6 +29,14 @@ bili publish status <task_id>
 bili trending --count 10
 ```
 
+## Docs
+
+- [Command reference](docs/commands.md)
+- [Agent usage](docs/agent_usage.md)
+- [JSON schema](docs/schema.md)
+- [Troubleshooting](docs/troubleshooting.md)
+- [Release checklist](RELEASE_CHECKLIST.md)
+
 ## Commands
 
 ```bash

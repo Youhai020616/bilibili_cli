@@ -8,4 +8,6 @@
 - Added live room listing, info, stream, and danmaku commands.
 - Added publish planning and creator browser handoff flows.
 - Added analytics, notifications, and messages commands.
+- Added JSON schema, troubleshooting, and release checklist docs.
+- Added GitHub Actions CI and contract tests for CLI JSON output.
 - Bumped package version metadata for release readiness.
