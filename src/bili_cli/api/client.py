@@ -410,6 +410,111 @@ class BiliAPIClient:
         items = [_normalize_video_card(item) for item in list(raw_items)[:count]]
         return {"source": source, "rid": rid, "items": items}
 
+    def live_list(self, *, keyword: str | None = None, count: int = 20, page: int = 1) -> dict[str, Any]:
+        if keyword:
+            result = self.search(keyword=keyword, search_type="live", limit=count, page=page)
+            result["items"] = [_normalize_live_search_item(item) for item in result.get("items") or []]
+            return result
+        payload = self.get_json(
+            constants.LIVE_MAIN_LIST_URL,
+            params={"platform": "web"},
+            headers={"Referer": "https://live.bilibili.com/"},
+        )
+        data = payload.get("data") or {}
+        raw_items = data.get("recommend_room_list") or []
+        return {
+            "keyword": None,
+            "page": 1,
+            "limit": count,
+            "online_total": data.get("online_total"),
+            "dynamic": data.get("dynamic"),
+            "items": [_normalize_live_room_card(item) for item in raw_items[:count]],
+        }
+
+    def live_info(self, room_id: str | int, *, show_urls: bool = False) -> dict[str, Any]:
+        room = self._live_room_info(room_id)
+        anchor = self._optional_data(
+            constants.LIVE_ANCHOR_INFO_URL,
+            params={"roomid": room.get("room_id") or room_id},
+            headers={"Referer": f"https://live.bilibili.com/{room_id}"},
+        )
+        play = self._optional_data(
+            constants.LIVE_PLAY_INFO_URL,
+            params=_live_play_params(room.get("room_id") or room_id),
+            headers={"Referer": f"https://live.bilibili.com/{room_id}"},
+        )
+        return _normalize_live_info(room, anchor=anchor, play=play, show_urls=show_urls)
+
+    def live_streams(self, room_id: str | int, *, show_urls: bool = False) -> dict[str, Any]:
+        room = self._live_room_info(room_id)
+        play = self.get_json(
+            constants.LIVE_PLAY_INFO_URL,
+            params=_live_play_params(room.get("room_id") or room_id),
+            headers={"Referer": f"https://live.bilibili.com/{room_id}"},
+        ).get("data") or {}
+        return {
+            "room_id": str(room.get("room_id") or room_id),
+            "short_id": room.get("short_id"),
+            "live_status": room.get("live_status"),
+            "is_live": room.get("live_status") == 1,
+            "streams": _extract_live_streams(play, show_urls=show_urls),
+            "qualities": _live_quality_desc(play),
+        }
+
+    def live_danmaku(self, room_id: str | int, *, count: int = 20) -> dict[str, Any]:
+        room = self._live_room_info(room_id)
+        payload = self.get_json(
+            constants.LIVE_DANMAKU_HISTORY_URL,
+            params={"roomid": room.get("room_id") or room_id},
+            headers={"Referer": f"https://live.bilibili.com/{room_id}"},
+        )
+        data = payload.get("data") or {}
+        items = [_normalize_live_danmaku(item) for item in (data.get("room") or [])]
+        admin_items = [_normalize_live_danmaku(item) for item in (data.get("admin") or [])]
+        return {
+            "room_id": str(room.get("room_id") or room_id),
+            "short_id": room.get("short_id"),
+            "live_status": room.get("live_status"),
+            "is_live": room.get("live_status") == 1,
+            "items": (admin_items + items)[: max(count, 0)],
+        }
+
+    def live_danmaku_conf(self, room_id: str | int) -> dict[str, Any]:
+        room = self._live_room_info(room_id)
+        payload = self.get_json(
+            constants.LIVE_DANMU_CONF_URL,
+            params={"room_id": room.get("room_id") or room_id, "platform": "pc", "player": "web"},
+            headers={"Referer": f"https://live.bilibili.com/{room_id}"},
+        )
+        data = payload.get("data") or {}
+        hosts = data.get("host_server_list") or data.get("server_list") or []
+        return {
+            "room_id": str(room.get("room_id") or room_id),
+            "host": data.get("host"),
+            "port": data.get("port"),
+            "token_present": bool(data.get("token")),
+            "hosts": [
+                {
+                    "host": item.get("host"),
+                    "port": item.get("port"),
+                    "ws_port": item.get("ws_port"),
+                    "wss_port": item.get("wss_port"),
+                }
+                for item in hosts
+            ],
+        }
+
+    def _live_room_info(self, room_id: str | int) -> dict[str, Any]:
+        payload = self.get_json(
+            constants.LIVE_ROOM_INFO_URL,
+            params={"room_id": room_id},
+            headers={"Referer": f"https://live.bilibili.com/{room_id}"},
+        )
+        data = payload.get("data") or {}
+        if not data:
+            raise APIError("Empty live room response", "API_SCHEMA_CHANGED", True)
+        return data
+
     def user_info(self, mid: str | int) -> dict[str, Any]:
         user_mid = _normalize_mid(mid)
         referer = f"https://space.bilibili.com/{user_mid}/"
@@ -841,6 +946,174 @@ def _normalize_favorite_folder(item: dict[str, Any]) -> dict[str, Any]:
         "attr": item.get("attr"),
         "cover": item.get("cover") or "",
         "url": f"https://space.bilibili.com/{item.get('mid')}/favlist?fid={folder_id}" if item.get("mid") and folder_id else "",
+    }
+
+
+def _live_play_params(room_id: str | int) -> dict[str, Any]:
+    return {
+        "room_id": room_id,
+        "protocol": "0,1",
+        "format": "0,1,2",
+        "codec": "0,1",
+        "qn": 10000,
+        "platform": "web",
+        "ptype": 8,
+    }
+
+
+def _normalize_live_search_item(item: dict[str, Any]) -> dict[str, Any]:
+    room_id = item.get("room_id") or item.get("id")
+    return {
+        "type": "live",
+        "room_id": room_id,
+        "id": room_id,
+        "uid": item.get("mid") or item.get("uid"),
+        "title": _clean(item.get("title")),
+        "anchor": _clean(item.get("author") or item.get("uname")),
+        "online": item.get("online"),
+        "cover": item.get("cover"),
+        "url": f"https://live.bilibili.com/{room_id}" if room_id else "",
+    }
+
+
+def _normalize_live_room_card(item: dict[str, Any]) -> dict[str, Any]:
+    room_id = item.get("roomid") or item.get("room_id")
+    return {
+        "type": "live",
+        "room_id": room_id,
+        "id": room_id,
+        "uid": item.get("uid"),
+        "title": _clean(item.get("title")),
+        "anchor": _clean(item.get("uname")),
+        "online": item.get("online"),
+        "cover": item.get("cover"),
+        "keyframe": item.get("keyframe"),
+        "area": {
+            "id": item.get("area_v2_id"),
+            "name": item.get("area_v2_name"),
+            "parent_id": item.get("area_v2_parent_id"),
+            "parent_name": item.get("area_v2_parent_name"),
+        },
+        "url": f"https://live.bilibili.com/{room_id}" if room_id else "",
+    }
+
+
+def _normalize_live_info(room: dict[str, Any], *, anchor: dict[str, Any], play: dict[str, Any], show_urls: bool) -> dict[str, Any]:
+    anchor_info = anchor.get("info") or {}
+    room_id = room.get("room_id")
+    return {
+        "type": "live",
+        "room_id": str(room_id or ""),
+        "short_id": room.get("short_id"),
+        "uid": room.get("uid"),
+        "title": _clean(room.get("title")),
+        "description": _clean(room.get("description")),
+        "live_status": room.get("live_status"),
+        "status": _live_status_name(room.get("live_status")),
+        "is_live": room.get("live_status") == 1,
+        "online": room.get("online"),
+        "attention": room.get("attention"),
+        "live_time": room.get("live_time"),
+        "cover": room.get("user_cover") or room.get("keyframe") or room.get("background"),
+        "keyframe": room.get("keyframe"),
+        "background": room.get("background"),
+        "tags": [tag.strip() for tag in str(room.get("tags") or "").split(",") if tag.strip()],
+        "area": {
+            "id": room.get("area_id"),
+            "name": room.get("area_name"),
+            "parent_id": room.get("parent_area_id"),
+            "parent_name": room.get("parent_area_name"),
+        },
+        "anchor": {
+            "uid": anchor_info.get("uid") or room.get("uid"),
+            "name": anchor_info.get("uname") or "",
+            "face": anchor_info.get("face") or "",
+            "level": anchor_info.get("platform_user_level"),
+            "official": anchor_info.get("official_verify") or {},
+        },
+        "streams": _extract_live_streams(play, show_urls=show_urls),
+        "qualities": _live_quality_desc(play),
+        "url": f"https://live.bilibili.com/{room_id}" if room_id else "",
+    }
+
+
+def _extract_live_streams(play: dict[str, Any], *, show_urls: bool) -> list[dict[str, Any]]:
+    playurl = (play.get("playurl_info") or {}).get("playurl") or {}
+    streams = []
+    for stream in playurl.get("stream") or []:
+        protocol = stream.get("protocol_name") or ""
+        for fmt in stream.get("format") or []:
+            format_name = fmt.get("format_name") or ""
+            for codec in fmt.get("codec") or []:
+                urls = _live_stream_urls(codec)
+                public = {
+                    "protocol": protocol,
+                    "format": format_name,
+                    "codec": codec.get("codec_name") or "",
+                    "current_qn": codec.get("current_qn"),
+                    "accept_qn": codec.get("accept_qn") or [],
+                    "url_present": bool(urls),
+                    "url_count": len(urls),
+                }
+                if show_urls:
+                    public["urls"] = urls
+                    public["url"] = urls[0] if urls else ""
+                streams.append(public)
+    return streams
+
+
+def _live_stream_urls(codec: dict[str, Any]) -> list[str]:
+    base_url = codec.get("base_url") or codec.get("baseUrl") or ""
+    if not base_url:
+        return []
+    urls = []
+    for item in codec.get("url_info") or []:
+        host = item.get("host") or ""
+        extra = item.get("extra") or ""
+        if base_url.startswith("http"):
+            url = base_url
+        else:
+            url = host.rstrip("/") + base_url
+        if extra:
+            if url.endswith("?") or extra.startswith("?"):
+                url += extra
+            else:
+                url += "?" + extra
+        urls.append(url)
+    return urls
+
+
+def _live_quality_desc(play: dict[str, Any]) -> list[dict[str, Any]]:
+    playurl = (play.get("playurl_info") or {}).get("playurl") or {}
+    return [{"qn": item.get("qn"), "desc": item.get("desc")} for item in playurl.get("g_qn_desc") or []]
+
+
+def _live_status_name(value: Any) -> str:
+    if value == 1:
+        return "live"
+    if value == 2:
+        return "round"
+    return "offline"
+
+
+def _normalize_live_danmaku(item: dict[str, Any]) -> dict[str, Any]:
+    user_level = item.get("user_level") or []
+    medal = item.get("medal") or []
+    return {
+        "id": item.get("id_str") or item.get("id") or item.get("rnd"),
+        "text": item.get("text") or "",
+        "uid": item.get("uid"),
+        "uname": item.get("nickname") or item.get("uname") or "",
+        "timeline": item.get("timeline") or "",
+        "is_admin": bool(item.get("isadmin")),
+        "vip": item.get("vip"),
+        "svip": item.get("svip"),
+        "guard_level": item.get("guard_level"),
+        "user_level": user_level[0] if user_level else None,
+        "medal": {
+            "name": medal[1] if len(medal) > 1 else "",
+            "level": medal[0] if medal else None,
+        },
     }
 
 

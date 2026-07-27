@@ -2,6 +2,7 @@
 
 BILI_DOMAIN = "https://www.bilibili.com"
 API_DOMAIN = "https://api.bilibili.com"
+LIVE_API_DOMAIN = "https://api.live.bilibili.com"
 
 NAV_URL = f"{API_DOMAIN}/x/web-interface/nav"
 SEARCH_URL = f"{API_DOMAIN}/x/web-interface/search/type"
@@ -29,6 +30,12 @@ WATCHLATER_ADD_URL = f"{API_DOMAIN}/x/v2/history/toview/add"
 RELATION_MODIFY_URL = f"{API_DOMAIN}/x/relation/modify"
 COMMENT_ADD_URL = f"{API_DOMAIN}/x/v2/reply/add"
 COMMENT_DELETE_URL = f"{API_DOMAIN}/x/v2/reply/del"
+LIVE_MAIN_LIST_URL = f"{LIVE_API_DOMAIN}/xlive/web-interface/v1/webMain/getList"
+LIVE_ROOM_INFO_URL = f"{LIVE_API_DOMAIN}/room/v1/Room/get_info"
+LIVE_ANCHOR_INFO_URL = f"{LIVE_API_DOMAIN}/live_user/v1/UserInfo/get_anchor_in_room"
+LIVE_PLAY_INFO_URL = f"{LIVE_API_DOMAIN}/xlive/web-room/v2/index/getRoomPlayInfo"
+LIVE_DANMU_CONF_URL = f"{LIVE_API_DOMAIN}/room/v1/Danmu/getConf"
+LIVE_DANMAKU_HISTORY_URL = f"{LIVE_API_DOMAIN}/xlive/web-room/v1/dM/gethistory"
 
 DEFAULT_USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "

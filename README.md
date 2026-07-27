@@ -22,6 +22,8 @@ bili danmaku BV1xx411c7mD --format json
 bili download BV1xx411c7mD --quality 360p --links-only --json
 bili user info 2 --json
 bili profile 2 --videos --limit 5 --json
+bili live list --count 5 --json
+bili live info <room_id> --json
 bili trending --count 10
 ```
 
@@ -49,6 +51,12 @@ bili user followers <mid> --limit 20
 bili user following <mid> --limit 20
 bili user favorites <mid> --limit 20
 bili profile <mid> --videos --followers --limit 5
+bili live list --count 10
+bili live info <room_id> --json
+bili live streams <room_id> --show-urls --json
+bili live danmaku <room_id> --count 20
+bili live danmaku-conf <room_id> --json
+bili live record <room_id> --duration 60
 bili like BVxxxx
 bili coin BVxxxx --count 1
 bili favorite folders
@@ -78,6 +86,8 @@ Read-heavy commands use Bilibili web APIs first. Login and browser-only flows us
 Some space list endpoints may require a valid logged-in session or manual risk verification. Profile summary data uses public API surfaces where available and returns structured section errors when optional profile sections are blocked.
 
 Write commands are dry-run by default and write an audit event under `~/.bili/audit/`. Add `--yes` only when you intentionally want to execute the action with a valid logged-in Bilibili session.
+
+Live stream URLs and danmaku connection tokens are treated as expiring private data. Stream URLs are hidden unless `--show-urls` or `--show-url` is provided; danmaku config reports only whether a token is present.
 
 ## Local State
 

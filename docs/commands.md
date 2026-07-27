@@ -25,6 +25,12 @@ bili user followers <mid> --limit 20
 bili user following <mid> --limit 20
 bili user favorites <mid> --limit 20
 bili profile <mid> --videos --limit 5
+bili live list --count 10
+bili live info <room_id>
+bili live streams <room_id> --show-urls --json
+bili live danmaku <room_id> --count 20
+bili live danmaku-conf <room_id> --json
+bili live record <room_id> --duration 60
 bili like BVxxxx
 bili like BVxxxx --unlike --yes
 bili coin BVxxxx --count 1
@@ -44,3 +50,5 @@ Every data command should support `--json` for agent consumption.
 `user info` combines stable public profile APIs (`card`, relation stats, nav counts, privacy settings). Space list commands use Bilibili list APIs and may return structured `LOGIN_REQUIRED`, `CAPTCHA_REQUIRED`, or `RATE_LIMITED` errors when Bilibili blocks unauthenticated/risky access.
 
 All write commands are safe by default: without `--yes`, they return a dry-run plan and append an audit event. `--dry-run` always wins when both `--dry-run` and `--yes` are provided.
+
+Live stream URLs are hidden by default because they expire quickly. Use `--show-urls` or `--show-url` only when the caller needs the raw stream URL. Danmaku connection config redacts the token value and exposes only `token_present`.
