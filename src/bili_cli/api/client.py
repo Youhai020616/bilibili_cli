@@ -504,6 +504,36 @@ class BiliAPIClient:
             ],
         }
 
+    def notifications(self) -> dict[str, Any]:
+        payload = self.get_json(constants.MSGFEED_UNREAD_URL, headers={"Referer": "https://www.bilibili.com/"})
+        data = payload.get("data") or {}
+        return {
+            "counts": {
+                "at": data.get("at"),
+                "reply": data.get("reply"),
+                "like": data.get("like"),
+                "sys_msg": data.get("sys_msg"),
+                "msg": data.get("msg"),
+                "live": data.get("live"),
+                "dynamic": data.get("dynamic"),
+                "follow": data.get("follow"),
+            },
+            "raw": data,
+        }
+
+    def messages(self, *, limit: int = 20) -> dict[str, Any]:
+        payload = self.get_json(
+            constants.VC_SESSION_LIST_URL,
+            params={"session_type": 1, "platform": "web"},
+            headers={"Referer": "https://message.bilibili.com/"},
+        )
+        data = payload.get("data") or {}
+        raw_items = data.get("session_list") or data.get("sessionList") or []
+        return {
+            "items": [_normalize_message_session(item) for item in raw_items[:limit]],
+            "total": data.get("total_count") or data.get("total"),
+        }
+
     def _live_room_info(self, room_id: str | int) -> dict[str, Any]:
         payload = self.get_json(
             constants.LIVE_ROOM_INFO_URL,
@@ -1114,6 +1144,24 @@ def _normalize_live_danmaku(item: dict[str, Any]) -> dict[str, Any]:
             "name": medal[1] if len(medal) > 1 else "",
             "level": medal[0] if medal else None,
         },
+    }
+
+
+def _normalize_message_session(item: dict[str, Any]) -> dict[str, Any]:
+    last_msg = item.get("last_msg") or item.get("lastMsg") or {}
+    if isinstance(last_msg, str):
+        last_text = last_msg
+    elif isinstance(last_msg, dict):
+        last_text = last_msg.get("content") or last_msg.get("text") or last_msg.get("message") or ""
+    else:
+        last_text = ""
+    return {
+        "type": "message_session",
+        "talker_id": item.get("talker_id") or item.get("talkerId"),
+        "nickname": item.get("nickname") or item.get("talker_name") or "",
+        "unread": item.get("unread_count") or item.get("unreadCount") or 0,
+        "last_text": last_text,
+        "session_ts": item.get("session_ts") or item.get("sessionTs"),
     }
 
 

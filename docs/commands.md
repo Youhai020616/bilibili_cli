@@ -36,6 +36,10 @@ bili publish status <task_id>
 bili creator open --page upload
 bili creator videos --limit 20
 bili creator delete <aid> --dry-run
+bili analytics --video BVxxxx --json
+bili analytics --json
+bili notifications --json
+bili messages --limit 20
 bili like BVxxxx
 bili like BVxxxx --unlike --yes
 bili coin BVxxxx --count 1
@@ -59,3 +63,5 @@ All write commands are safe by default: without `--yes`, they return a dry-run p
 Live stream URLs are hidden by default because they expire quickly. Use `--show-urls` or `--show-url` only when the caller needs the raw stream URL. Danmaku connection config redacts the token value and exposes only `token_present`.
 
 Publish commands default to dry-run and store local tasks under `~/.bili/logs/publish/`. `creator open` is a browser handoff for manual completion; `creator delete` uses the same pattern for now to avoid destructive behavior without an explicit logged-in session.
+
+`analytics` is split between video analytics and local activity analytics. `notifications` and `messages` return structured login/rate-limit errors when the account session is unavailable.

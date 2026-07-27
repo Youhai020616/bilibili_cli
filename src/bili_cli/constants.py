@@ -39,6 +39,8 @@ LIVE_DANMAKU_HISTORY_URL = f"{LIVE_API_DOMAIN}/xlive/web-room/v1/dM/gethistory"
 CREATOR_HOME_URL = "https://member.bilibili.com/platform/home"
 CREATOR_UPLOAD_URL = "https://member.bilibili.com/platform/upload/video/frame"
 CREATOR_VIDEO_MANAGER_URL = "https://member.bilibili.com/platform/upload-manager/article"
+MSGFEED_UNREAD_URL = f"{API_DOMAIN}/x/msgfeed/unread"
+VC_SESSION_LIST_URL = "https://api.vc.bilibili.com/session_svr/v1/session_svr/get_sessions"
 
 DEFAULT_USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "

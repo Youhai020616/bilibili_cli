@@ -64,6 +64,10 @@ bili publish status <task_id>
 bili creator open --page upload
 bili creator videos --limit 20
 bili creator delete <aid> --dry-run
+bili analytics --video BVxxxx --json
+bili analytics --json
+bili notifications --json
+bili messages --limit 20
 bili like BVxxxx
 bili coin BVxxxx --count 1
 bili favorite folders
