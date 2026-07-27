@@ -19,6 +19,8 @@ bili read 1
 bili video info BV1xx411c7mD --json
 bili comments BV1xx411c7mD --count 5
 bili danmaku BV1xx411c7mD --format json
+bili ranking --rid 0
+bili hot-search
 bili download BV1xx411c7mD --quality 360p --links-only --json
 bili user info 2 --json
 bili profile 2 --videos --limit 5 --json
@@ -83,6 +85,8 @@ bili favorite add BVxxxx --folder <folder_id>
 bili watchlater add BVxxxx
 bili follow <mid>
 bili comment post BVxxxx "comment text"
+bili ranking --rid 0
+bili hot-search
 bili trending --source popular --count 20
 
 bili account list
@@ -103,6 +107,8 @@ CLI commands
 Read-heavy commands use Bilibili web APIs first. Login and browser-only flows use Playwright. Write actions are planned behind dry-run and confirmation gates.
 
 Some space list endpoints may require a valid logged-in session or manual risk verification. Profile summary data uses public API surfaces where available and returns structured section errors when optional profile sections are blocked.
+
+`ranking` uses the public ranking API first and falls back to a headless Playwright browser fetch when Bilibili returns a risk response.
 
 Write commands are dry-run by default and write an audit event under `~/.bili/audit/`. Add `--yes` only when you intentionally want to execute the action with a valid logged-in Bilibili session.
 

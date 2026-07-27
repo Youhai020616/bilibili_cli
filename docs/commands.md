@@ -19,6 +19,8 @@ bili video info BVxxxx
 bili video comments BVxxxx
 bili danmaku BVxxxx
 bili download BVxxxx --quality 360p
+bili ranking --rid 0
+bili hot-search
 bili user info <mid>
 bili user videos <mid> --limit 20
 bili user followers <mid> --limit 20
@@ -55,6 +57,8 @@ bili trending
 ```
 
 Every data command should support `--json` for agent consumption.
+
+`ranking` uses API first and falls back to Playwright browser fetch when the public API returns a risk response. The JSON envelope reports this with `strategy: "browser"` and `fallback_used: true`.
 
 `user info` combines stable public profile APIs (`card`, relation stats, nav counts, privacy settings). Space list commands use Bilibili list APIs and may return structured `LOGIN_REQUIRED`, `CAPTCHA_REQUIRED`, or `RATE_LIMITED` errors when Bilibili blocks unauthenticated/risky access.
 

@@ -9,6 +9,7 @@ import re
 import time
 import xml.etree.ElementTree as ET
 from typing import Any
+from urllib.parse import quote_plus
 
 import httpx
 
@@ -17,6 +18,7 @@ from bili_cli.config import load_config
 from bili_cli.errors import APIError, BiliError, CaptchaRequiredError, LoginRequiredError, map_api_code
 from bili_cli.session import account_name, cookie_header, csrf_token
 from bili_cli.utils.ids import VideoRef, parse_video_ref, video_url
+from bili_cli.utils.wbi import extract_wbi_keys, wbi_sign
 
 
 class BiliAPIClient:
@@ -174,11 +176,7 @@ class BiliAPIClient:
         raise APIError(str(last_error or "Request failed"), "NETWORK_ERROR", True)
 
     def status(self) -> dict[str, Any]:
-        try:
-            resp = self.client.get(constants.NAV_URL)
-            payload = resp.json()
-        except Exception as exc:
-            raise APIError("Unable to read login status", "NETWORK_ERROR", True) from exc
+        payload = self._nav_payload()
         code = int(payload.get("code") or 0)
         if code == -101:
             return {
@@ -409,6 +407,33 @@ class BiliAPIClient:
             raw_items = (payload.get("data") or {}).get("list") or []
         items = [_normalize_video_card(item) for item in list(raw_items)[:count]]
         return {"source": source, "rid": rid, "items": items}
+
+    def hot_search(self, *, count: int = 10) -> dict[str, Any]:
+        nav = self._nav_payload()
+        nav_data = nav.get("data") or {}
+        try:
+            img_key, sub_key = extract_wbi_keys(nav_data)
+        except ValueError as exc:
+            raise APIError("Unable to derive WBI keys", "API_SCHEMA_CHANGED", True) from exc
+        params = wbi_sign(
+            {"platform": "web", "limit": min(max(count, 1), 50)},
+            img_key=img_key,
+            sub_key=sub_key,
+        )
+        payload = self.get_json(
+            constants.HOT_SEARCH_URL,
+            params=params,
+            headers={"Referer": "https://search.bilibili.com/"},
+        )
+        data = payload.get("data") or {}
+        trending = data.get("trending") or {}
+        raw_items = trending.get("list") or []
+        items = [_normalize_hot_search_item(item, rank=index + 1) for index, item in enumerate(raw_items[:count])]
+        return {
+            "title": trending.get("title"),
+            "trackid": trending.get("trackid"),
+            "items": items,
+        }
 
     def live_list(self, *, keyword: str | None = None, count: int = 20, page: int = 1) -> dict[str, Any]:
         if keyword:
@@ -752,6 +777,16 @@ class BiliAPIClient:
         data = payload.get("data") or {}
         return data if isinstance(data, dict) else {}
 
+    def _nav_payload(self) -> dict[str, Any]:
+        try:
+            resp = self.client.get(constants.NAV_URL)
+            payload = resp.json()
+        except Exception as exc:
+            raise APIError("Unable to read login status", "NETWORK_ERROR", True) from exc
+        if not isinstance(payload, dict):
+            raise APIError("Unexpected navigation response type", "API_SCHEMA_CHANGED", True)
+        return payload
+
     def _require_write_session(self) -> str:
         token = csrf_token(self.account)
         if not token:
@@ -831,6 +866,21 @@ def _normalize_search_item(item: dict[str, Any], search_type: str) -> dict[str, 
         "pubdate": item.get("pubdate"),
         "typename": item.get("typename"),
         "url": item.get("arcurl") or video_url(bvid, aid),
+    }
+
+
+def _normalize_hot_search_item(item: dict[str, Any], *, rank: int) -> dict[str, Any]:
+    keyword = _clean(item.get("keyword"))
+    show_name = _clean(item.get("show_name") or keyword)
+    link = f"https://search.bilibili.com/all?keyword={quote_plus(keyword or show_name)}"
+    return {
+        "rank": rank,
+        "keyword": keyword,
+        "show_name": show_name,
+        "icon": item.get("icon"),
+        "goto": item.get("goto"),
+        "uri": item.get("uri"),
+        "link": item.get("link") or link,
     }
 
 

@@ -35,6 +35,8 @@ class AliasGroup(click.Group):
         "cr": "creator",
         "ana": "analytics",
         "msg": "messages",
+        "rank": "ranking",
+        "hs": "hot-search",
     }
 
     def get_command(self, ctx: click.Context, cmd_name: str):
@@ -66,7 +68,7 @@ from bili_cli.commands.live import live_group
 from bili_cli.commands.analytics import analytics, messages, notifications
 from bili_cli.commands.publish import creator_group, publish_group
 from bili_cli.commands.search import search
-from bili_cli.commands.trending import trending
+from bili_cli.commands.trending import hot_search, ranking, trending
 from bili_cli.commands.user import profile, user_group
 from bili_cli.commands.video import comments, detail, read, video_group
 
@@ -87,6 +89,8 @@ cli.add_command(comments)
 cli.add_command(danmaku)
 cli.add_command(download)
 cli.add_command(trending)
+cli.add_command(ranking)
+cli.add_command(hot_search)
 cli.add_command(user_group, "user")
 cli.add_command(profile)
 cli.add_command(like)

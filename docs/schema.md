@@ -65,6 +65,8 @@ Optional error fields:
 - Search results: `items[]` with `title`, `bvid`, `aid`, `author`, `play`, `duration`.
 - Video detail: `bvid`, `aid`, `title`, `owner`, `stat`, `pages`, `url`.
 - Comments: `comments[]` with `rpid`, `member`, `message`, `like`, `reply_count`.
+- Ranking/trending: `items[]` with normalized video cards.
+- Hot search: `items[]` with `rank`, `keyword`, `show_name`, `link`.
 - Live info: `room_id`, `title`, `status`, `anchor`, `stream`.
 - Publish tasks: `task_id`, `status`, `plan`.
 

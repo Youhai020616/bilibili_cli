@@ -8,6 +8,7 @@ from click.testing import CliRunner
 import bili_cli.commands.interact as interact_cmd
 import bili_cli.commands.search as search_cmd
 import bili_cli.commands.video as video_cmd
+import bili_cli.commands.trending as trending_cmd
 
 
 class FakeSearchClient:
@@ -113,3 +114,24 @@ def test_like_dry_run_contract(monkeypatch, tmp_path) -> None:
     assert payload["data"]["dry_run"] is True
     assert payload["data"]["executed"] is False
     assert payload["data"]["next_action"].startswith("Re-run with --yes")
+
+
+def test_hot_search_json_contract(monkeypatch) -> None:
+    class FakeClient:
+        def hot_search(self, *, count: int = 10):
+            return {"title": "Hot", "trackid": "abc", "items": [{"rank": 1, "keyword": "AI", "show_name": "AI"}]}
+
+        def close(self) -> None:
+            return None
+
+    fake = FakeClient()
+    runner = CliRunner()
+    monkeypatch.setattr(trending_cmd.BiliAPIClient, "from_config", classmethod(lambda cls, account=None: fake))
+
+    result = runner.invoke(trending_cmd.hot_search, ["--json"])
+
+    assert result.exit_code == 0, result.output
+    payload = _parse_json(result.output)
+    assert payload["ok"] is True
+    assert payload["command"] == "hot-search"
+    assert payload["data"]["items"][0]["keyword"] == "AI"

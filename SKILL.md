@@ -18,6 +18,8 @@ bili search "keyword" --limit 10 --json
 bili video info <bvid_or_index> --json
 bili comments <bvid_or_index> --count 20 --json
 bili danmaku <bvid_or_index> --format json
+bili ranking --rid 0 --json
+bili hot-search --json
 bili trending --count 20 --json
 bili user info <mid> --json
 bili live info <room_id> --json
