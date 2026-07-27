@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from bili_cli.commands.download import _public_download_result
 from bili_cli.downloader.streams import public_stream_plan, select_streams
 
 
@@ -40,3 +41,21 @@ def test_public_stream_plan_redacts_urls() -> None:
     assert plan["video"]["url_present"] is True
     assert "url" not in plan["video"]
     assert plan["audio"]["backup_url_count"] == 0
+
+
+def test_public_download_result_drops_private_streams() -> None:
+    result = {
+        "video": {"bvid": "BV1xx411c7mD"},
+        "pages": [
+            {
+                "page": 1,
+                "streams": {"video": {"url_present": True}},
+                "_private_streams": {"video": {"url": "expiring-url"}},
+            }
+        ],
+    }
+
+    public = _public_download_result(result)
+
+    assert "_private_streams" not in public["pages"][0]
+    assert "_private_streams" in result["pages"][0]

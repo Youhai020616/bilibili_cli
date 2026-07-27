@@ -80,7 +80,7 @@ def download(
 
         if links_only:
             if json_mode:
-                print_json(result, command="download", strategy="api", account=account)
+                print_json(_public_download_result(result), command="download", strategy="api", account=account)
             else:
                 _print_download_plan(result)
             return
@@ -97,7 +97,7 @@ def download(
                 detail=detail,
             )
         if json_mode:
-            print_json(result, command="download", strategy="api", account=account)
+            print_json(_public_download_result(result), command="download", strategy="api", account=account)
         else:
             success(f"Downloaded {len(plans)} page(s) to {output_base}")
     except BiliError as exc:
@@ -272,6 +272,13 @@ def _video_public(detail: dict[str, Any]) -> dict[str, Any]:
         "owner": {"mid": owner.get("mid"), "name": owner.get("name")},
         "pages": len(detail.get("pages") or []),
     }
+
+
+def _public_download_result(result: dict[str, Any]) -> dict[str, Any]:
+    pages = []
+    for page in result.get("pages") or []:
+        pages.append({key: value for key, value in page.items() if key != "_private_streams"})
+    return {**result, "pages": pages}
 
 
 def _print_download_plan(result: dict[str, Any]) -> None:
