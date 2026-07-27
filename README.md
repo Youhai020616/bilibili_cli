@@ -24,6 +24,8 @@ bili user info 2 --json
 bili profile 2 --videos --limit 5 --json
 bili live list --count 5 --json
 bili live info <room_id> --json
+bili publish -t "Title" -c "Desc" -v video.mp4 --dry-run
+bili publish status <task_id>
 bili trending --count 10
 ```
 
@@ -57,6 +59,11 @@ bili live streams <room_id> --show-urls --json
 bili live danmaku <room_id> --count 20
 bili live danmaku-conf <room_id> --json
 bili live record <room_id> --duration 60
+bili publish -t "Title" -c "Desc" -v video.mp4 --tags AI --dry-run
+bili publish status <task_id>
+bili creator open --page upload
+bili creator videos --limit 20
+bili creator delete <aid> --dry-run
 bili like BVxxxx
 bili coin BVxxxx --count 1
 bili favorite folders

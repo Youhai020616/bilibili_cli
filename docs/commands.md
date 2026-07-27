@@ -31,6 +31,11 @@ bili live streams <room_id> --show-urls --json
 bili live danmaku <room_id> --count 20
 bili live danmaku-conf <room_id> --json
 bili live record <room_id> --duration 60
+bili publish -t "Title" -c "Desc" -v video.mp4 --dry-run
+bili publish status <task_id>
+bili creator open --page upload
+bili creator videos --limit 20
+bili creator delete <aid> --dry-run
 bili like BVxxxx
 bili like BVxxxx --unlike --yes
 bili coin BVxxxx --count 1
@@ -52,3 +57,5 @@ Every data command should support `--json` for agent consumption.
 All write commands are safe by default: without `--yes`, they return a dry-run plan and append an audit event. `--dry-run` always wins when both `--dry-run` and `--yes` are provided.
 
 Live stream URLs are hidden by default because they expire quickly. Use `--show-urls` or `--show-url` only when the caller needs the raw stream URL. Danmaku connection config redacts the token value and exposes only `token_present`.
+
+Publish commands default to dry-run and store local tasks under `~/.bili/logs/publish/`. `creator open` is a browser handoff for manual completion; `creator delete` uses the same pattern for now to avoid destructive behavior without an explicit logged-in session.

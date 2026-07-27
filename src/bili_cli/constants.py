@@ -36,6 +36,9 @@ LIVE_ANCHOR_INFO_URL = f"{LIVE_API_DOMAIN}/live_user/v1/UserInfo/get_anchor_in_r
 LIVE_PLAY_INFO_URL = f"{LIVE_API_DOMAIN}/xlive/web-room/v2/index/getRoomPlayInfo"
 LIVE_DANMU_CONF_URL = f"{LIVE_API_DOMAIN}/room/v1/Danmu/getConf"
 LIVE_DANMAKU_HISTORY_URL = f"{LIVE_API_DOMAIN}/xlive/web-room/v1/dM/gethistory"
+CREATOR_HOME_URL = "https://member.bilibili.com/platform/home"
+CREATOR_UPLOAD_URL = "https://member.bilibili.com/platform/upload/video/frame"
+CREATOR_VIDEO_MANAGER_URL = "https://member.bilibili.com/platform/upload-manager/article"
 
 DEFAULT_USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
