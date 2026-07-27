@@ -46,6 +46,7 @@ bili like BVxxxx
 bili like BVxxxx --unlike --yes
 bili coin BVxxxx --count 1
 bili favorite folders
+bili favorite items <folder_id> --limit 20
 bili favorite add BVxxxx --folder <folder_id>
 bili favorite remove BVxxxx --folder <folder_id>
 bili watchlater add BVxxxx

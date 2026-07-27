@@ -60,6 +60,30 @@ class FakeVideoClient:
         self.closed = True
 
 
+class FakeFavoriteClient:
+    def favorite_resources(self, *_args, **_kwargs):
+        return {
+            "folder": {"id": 123, "title": "Folder", "media_count": 1},
+            "page": 1,
+            "limit": 20,
+            "has_more": False,
+            "items": [
+                {
+                    "type": "video",
+                    "bvid": "BV1xx411c7mD",
+                    "aid": 2,
+                    "title": "Demo",
+                    "author": "Author",
+                    "play": 123,
+                    "duration": 60,
+                }
+            ],
+        }
+
+    def close(self) -> None:
+        return None
+
+
 def _parse_json(output: str) -> dict[str, object]:
     return json.loads(output.strip())
 
@@ -114,6 +138,23 @@ def test_like_dry_run_contract(monkeypatch, tmp_path) -> None:
     assert payload["data"]["dry_run"] is True
     assert payload["data"]["executed"] is False
     assert payload["data"]["next_action"].startswith("Re-run with --yes")
+
+
+def test_favorite_items_json_contract(monkeypatch) -> None:
+    fake = FakeFavoriteClient()
+    runner = CliRunner()
+    monkeypatch.setattr(interact_cmd.BiliAPIClient, "from_config", classmethod(lambda cls, account=None: fake))
+    monkeypatch.setattr(interact_cmd, "save_index", lambda *args, **kwargs: None)
+
+    result = runner.invoke(interact_cmd.favorite_items, ["123", "--json"])
+
+    assert result.exit_code == 0, result.output
+    payload = _parse_json(result.output)
+    assert payload["ok"] is True
+    assert payload["schema_version"] == "1"
+    assert payload["command"] == "favorite.items"
+    assert payload["strategy"] == "api"
+    assert payload["data"]["items"][0]["bvid"] == "BV1xx411c7mD"
 
 
 def test_hot_search_json_contract(monkeypatch) -> None:

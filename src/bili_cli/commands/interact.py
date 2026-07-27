@@ -10,8 +10,9 @@ from bili_cli.api.client import BiliAPIClient
 from bili_cli.audit import write_audit_event
 from bili_cli.commands._common import fail, wants_json
 from bili_cli.errors import BiliError
-from bili_cli.index_cache import resolve_video_ref
-from bili_cli.output import print_json, print_table, status, success
+from bili_cli.index_cache import resolve_video_ref, save_index
+from bili_cli.output import fmt_count, print_json, print_search_results, print_table, status, success
+from bili_cli.utils.export import export_data
 
 
 @click.command("like", help="Like or unlike a video")
@@ -116,6 +117,63 @@ def favorite_folders(limit: int, page: int, account: str | None, as_json: bool, 
     else:
         rows = [[item.get("id"), item.get("title"), item.get("media_count")] for item in result.get("items") or []]
         print_table("Favorite folders", ["ID", "Title", "Media"], rows)
+
+
+@favorite_group.command("items", help="List items in a favorite folder")
+@click.argument("folder_id")
+@click.option("--limit", "--count", type=int, default=20, help="Result limit")
+@click.option("--page", type=int, default=1, help="Result page")
+@click.option("--keyword", default="", help="Filter by keyword")
+@click.option("--order", type=click.Choice(["mtime", "view", "pubtime"]), default="mtime", help="Sort order")
+@click.option("--media-type", type=int, default=0, help="Bilibili media type, 0 means all")
+@click.option("--account", default=None, help="Account profile name")
+@click.option("--json", "as_json", is_flag=True, help="Output JSON")
+@click.option("--json-output", "json_output", is_flag=True, help="Output JSON")
+@click.option("-o", "--output", default=None, help="Export items to .json/.csv/.yaml")
+def favorite_items(
+    folder_id: str,
+    limit: int,
+    page: int,
+    keyword: str,
+    order: str,
+    media_type: int,
+    account: str | None,
+    as_json: bool,
+    json_output: bool,
+    output: str | None,
+) -> None:
+    json_mode = wants_json(as_json, json_output)
+    client = BiliAPIClient.from_config(account)
+    try:
+        result = client.favorite_resources(
+            folder_id,
+            limit=limit,
+            page=page,
+            keyword=keyword,
+            order=order,
+            media_type=media_type,
+        )
+    except BiliError as exc:
+        fail(exc, as_json=json_mode, command="favorite.items", strategy="api")
+    finally:
+        client.close()
+
+    items = result.get("items") or []
+    save_index(items, query=f"favorite:{folder_id}:items", item_type="video")
+    if output:
+        export_data(items, output)
+        if not json_mode:
+            success(f"Exported {len(items)} items to {output}")
+    if json_mode:
+        print_json(result, command="favorite.items", strategy="api", account=account)
+    else:
+        folder = result.get("folder") or {}
+        status("Folder", f"{folder.get('title') or folder_id} ({folder.get('id') or folder_id})")
+        status("Items", f"{len(items)} shown / {fmt_count(folder.get('media_count'))} total")
+        print_search_results(items, folder.get("title") or f"favorite {folder_id}")
+
+
+favorite_group.add_command(favorite_items, "list")
 
 
 @favorite_group.command("add", help="Add a video to a favorite folder")

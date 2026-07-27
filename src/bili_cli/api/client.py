@@ -645,6 +645,46 @@ class BiliAPIClient:
             raise LoginRequiredError("Login is required to list your favorite folders")
         return self.user_favorites(status["mid"], limit=limit, page=page)
 
+    def favorite_resources(
+        self,
+        folder_id: str | int,
+        *,
+        limit: int = 20,
+        page: int = 1,
+        keyword: str = "",
+        order: str = "mtime",
+        media_type: int = 0,
+    ) -> dict[str, Any]:
+        folder = _normalize_folder_id(folder_id)
+        page_num = max(page, 1)
+        page_size = min(max(limit, 1), 50)
+        params = {
+            "media_id": folder,
+            "pn": page_num,
+            "ps": page_size,
+            "keyword": keyword,
+            "order": order,
+            "type": media_type,
+        }
+        payload = self.get_json(
+            constants.FAVORITE_RESOURCE_LIST_URL,
+            params=params,
+            headers={"Referer": f"https://space.bilibili.com/favlist?fid={folder}"},
+        )
+        data = payload.get("data") or {}
+        raw_items = data.get("medias") or []
+        return {
+            "folder": _normalize_favorite_folder_detail(data.get("info") or {}, folder_id=folder),
+            "page": page_num,
+            "limit": page_size,
+            "keyword": keyword,
+            "order": order,
+            "media_type": media_type,
+            "has_more": bool(data.get("has_more")),
+            "ttl": data.get("ttl"),
+            "items": [_normalize_favorite_media(item) for item in raw_items[:page_size]],
+        }
+
     def like_video(self, video_id: str, *, unlike: bool = False) -> dict[str, Any]:
         token = self._require_write_session()
         detail = self.video_detail(video_id)
@@ -809,6 +849,13 @@ def _normalize_mid(value: str | int) -> int:
     text = str(value).strip()
     if not text.isdigit():
         raise APIError(f"Unsupported user mid: {value}", "UNSUPPORTED_INPUT")
+    return int(text)
+
+
+def _normalize_folder_id(value: str | int) -> int:
+    text = str(value).strip()
+    if not text.isdigit():
+        raise APIError(f"Unsupported favorite folder id: {value}", "UNSUPPORTED_INPUT")
     return int(text)
 
 
@@ -1026,6 +1073,68 @@ def _normalize_favorite_folder(item: dict[str, Any]) -> dict[str, Any]:
         "attr": item.get("attr"),
         "cover": item.get("cover") or "",
         "url": f"https://space.bilibili.com/{item.get('mid')}/favlist?fid={folder_id}" if item.get("mid") and folder_id else "",
+    }
+
+
+def _normalize_favorite_folder_detail(item: dict[str, Any], *, folder_id: int) -> dict[str, Any]:
+    upper = item.get("upper") or {}
+    owner_mid = item.get("mid") or upper.get("mid")
+    resolved_id = item.get("id") or folder_id
+    return {
+        "type": "favorite_folder",
+        "id": resolved_id,
+        "fid": item.get("fid") or resolved_id,
+        "mid": owner_mid,
+        "title": item.get("title") or "",
+        "intro": _clean(item.get("intro")),
+        "media_count": item.get("media_count"),
+        "attr": item.get("attr"),
+        "cover": item.get("cover") or "",
+        "ctime": item.get("ctime"),
+        "mtime": item.get("mtime"),
+        "owner": {
+            "mid": upper.get("mid") or owner_mid,
+            "name": upper.get("name") or "",
+            "face": upper.get("face") or "",
+        },
+        "url": f"https://space.bilibili.com/{owner_mid}/favlist?fid={resolved_id}" if owner_mid and resolved_id else "",
+    }
+
+
+def _normalize_favorite_media(item: dict[str, Any]) -> dict[str, Any]:
+    media_type = item.get("type")
+    upper = item.get("upper") or {}
+    stats = item.get("cnt_info") or {}
+    bvid = item.get("bvid") or item.get("bv_id")
+    is_video = bool(bvid) or media_type == 2
+    aid = item.get("id") if is_video else None
+    media_url = (
+        video_url(bvid, aid)
+        if is_video and (bvid or aid)
+        else item.get("link") or item.get("media_list_link") or ""
+    )
+    return {
+        "type": "video" if is_video else "media",
+        "media_type": media_type,
+        "id": item.get("id"),
+        "aid": aid,
+        "bvid": bvid,
+        "title": _clean(item.get("title")),
+        "description": _clean(item.get("intro")),
+        "author": _clean(upper.get("name")),
+        "mid": upper.get("mid"),
+        "duration": item.get("duration"),
+        "page": item.get("page"),
+        "play": stats.get("play"),
+        "danmaku": stats.get("danmaku"),
+        "favorite": stats.get("collect"),
+        "reply": stats.get("reply"),
+        "ctime": item.get("ctime"),
+        "pubtime": item.get("pubtime"),
+        "fav_time": item.get("fav_time"),
+        "pic": item.get("cover"),
+        "cover": item.get("cover"),
+        "url": media_url,
     }
 
 

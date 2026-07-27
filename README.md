@@ -34,6 +34,7 @@ bili trending --count 10
 ## Docs
 
 - [Command reference](docs/commands.md)
+- [API interface reference](docs/api.md)
 - [Agent usage](docs/agent_usage.md)
 - [JSON schema](docs/schema.md)
 - [Troubleshooting](docs/troubleshooting.md)
@@ -81,6 +82,7 @@ bili messages --limit 20
 bili like BVxxxx
 bili coin BVxxxx --count 1
 bili favorite folders
+bili favorite items <folder_id>
 bili favorite add BVxxxx --folder <folder_id>
 bili watchlater add BVxxxx
 bili follow <mid>
