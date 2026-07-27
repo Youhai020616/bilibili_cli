@@ -19,6 +19,9 @@ bili read 1
 bili video info BV1xx411c7mD --json
 bili comments BV1xx411c7mD --count 5
 bili danmaku BV1xx411c7mD --format json
+bili download BV1xx411c7mD --quality 360p --links-only --json
+bili user info 2 --json
+bili profile 2 --videos --limit 5 --json
 bili trending --count 10
 ```
 
@@ -39,6 +42,13 @@ bili video info BVxxxx
 bili comments BVxxxx --count 20
 bili video comments BVxxxx --count 20 --replies <rpid>
 bili danmaku BVxxxx --page 1 --format ass -o danmaku.ass
+bili download BVxxxx --quality 360p --output ~/Desktop
+bili user info <mid>
+bili user videos <mid> --limit 20
+bili user followers <mid> --limit 20
+bili user following <mid> --limit 20
+bili user favorites <mid> --limit 20
+bili profile <mid> --videos --followers --limit 5
 bili trending --source popular --count 20
 
 bili account list
@@ -57,6 +67,8 @@ CLI commands
 ```
 
 Read-heavy commands use Bilibili web APIs first. Login and browser-only flows use Playwright. Write actions are planned behind dry-run and confirmation gates.
+
+Some space list endpoints may require a valid logged-in session or manual risk verification. Profile summary data uses public API surfaces where available and returns structured section errors when optional profile sections are blocked.
 
 ## Local State
 

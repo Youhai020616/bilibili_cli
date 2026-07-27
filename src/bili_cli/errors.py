@@ -58,6 +58,6 @@ def map_api_code(code: int, message: str) -> BiliError:
         return CaptchaRequiredError(message or "Risk verification required")
     if code in {-404, 62002}:
         return NotFoundError(message or "Resource not found")
-    if code in {-509, 429}:
+    if code in {-799, -509, 429}:
         return RateLimitedError(message or "Rate limited")
     return APIError(message or f"Bilibili API returned code {code}", "API_ERROR")

@@ -312,6 +312,51 @@ class BiliAPIClient:
             )
         return {"video": _video_summary(detail), "page": page, "cid": cid, "items": items}
 
+    def playurl(
+        self,
+        video_id: str,
+        *,
+        cid: int | None = None,
+        quality: str | int = "best",
+        page: int = 1,
+        fnval: int = 4048,
+    ) -> dict[str, Any]:
+        detail = self.video_detail(video_id)
+        pages = detail.get("pages") or []
+        if cid is None:
+            if page < 1 or page > len(pages):
+                raise APIError(f"Page out of range: {page}", "UNSUPPORTED_INPUT")
+            cid = pages[page - 1].get("cid")
+        if not cid:
+            raise APIError("Missing cid for selected page", "API_SCHEMA_CHANGED", True)
+
+        params = {
+            "bvid": detail.get("bvid"),
+            "cid": cid,
+            "qn": _quality_to_qn(quality),
+            "fnval": fnval,
+            "fourk": 1,
+        }
+        payload = self.get_json(
+            constants.PLAYER_PLAYURL_URL,
+            params=params,
+            headers={"Referer": video_url(detail.get("bvid"), detail.get("aid"))},
+        )
+        data = payload.get("data") or {}
+        return {
+            "video": _video_summary(detail),
+            "page": page,
+            "cid": cid,
+            "requested_quality": quality,
+            "actual_quality": data.get("quality"),
+            "accept_quality": data.get("accept_quality") or [],
+            "accept_description": data.get("accept_description") or [],
+            "timelength": data.get("timelength"),
+            "format": data.get("format"),
+            "dash": data.get("dash"),
+            "durl": data.get("durl"),
+        }
+
     def trending(self, *, count: int = 20, source: str = "popular", rid: int = 0) -> dict[str, Any]:
         if source == "ranking":
             payload = self.get_json(constants.RANKING_URL, params={"rid": rid, "type": "all"})
@@ -322,6 +367,114 @@ class BiliAPIClient:
         items = [_normalize_video_card(item) for item in list(raw_items)[:count]]
         return {"source": source, "rid": rid, "items": items}
 
+    def user_info(self, mid: str | int) -> dict[str, Any]:
+        user_mid = _normalize_mid(mid)
+        referer = f"https://space.bilibili.com/{user_mid}/"
+        card_payload = self.get_json(constants.USER_CARD_URL, params={"mid": user_mid}, headers={"Referer": referer})
+        card_data = card_payload.get("data") or {}
+        if not card_data.get("card"):
+            raise APIError("Empty user card response", "API_SCHEMA_CHANGED", True)
+        relation = self._optional_data(constants.RELATION_STAT_URL, params={"vmid": user_mid}, headers={"Referer": referer})
+        navnum = self._optional_data(constants.SPACE_NAVNUM_URL, params={"mid": user_mid}, headers={"Referer": referer})
+        setting = self._optional_data(constants.SPACE_SETTING_URL, params={"mid": user_mid}, headers={"Referer": referer})
+        return _normalize_user_info(card_data, relation=relation, navnum=navnum, setting=setting, mid=user_mid)
+
+    def user_videos(
+        self,
+        mid: str | int,
+        *,
+        limit: int = 20,
+        page: int = 1,
+        order: str = "pubdate",
+    ) -> dict[str, Any]:
+        user_mid = _normalize_mid(mid)
+        params = {
+            "mid": user_mid,
+            "pn": max(page, 1),
+            "ps": min(max(limit, 1), 50),
+            "order": order,
+        }
+        payload = self.get_json(
+            constants.SPACE_ARC_SEARCH_URL,
+            params=params,
+            headers={"Referer": f"https://space.bilibili.com/{user_mid}/video"},
+        )
+        data = payload.get("data") or {}
+        list_data = data.get("list") or {}
+        page_data = data.get("page") or {}
+        raw_items = list_data.get("vlist") or []
+        return {
+            "mid": str(user_mid),
+            "page": max(page, 1),
+            "limit": limit,
+            "total": page_data.get("count"),
+            "items": [_normalize_space_video(item) for item in raw_items[:limit]],
+        }
+
+    def user_following(self, mid: str | int, *, limit: int = 20, page: int = 1) -> dict[str, Any]:
+        return self._relation_list(mid, relation="following", limit=limit, page=page)
+
+    def user_followers(self, mid: str | int, *, limit: int = 20, page: int = 1) -> dict[str, Any]:
+        return self._relation_list(mid, relation="followers", limit=limit, page=page)
+
+    def user_favorites(self, mid: str | int, *, limit: int = 20, page: int = 1) -> dict[str, Any]:
+        user_mid = _normalize_mid(mid)
+        params = {"up_mid": user_mid, "pn": max(page, 1), "ps": min(max(limit, 1), 50)}
+        payload = self.get_json(
+            constants.FAVORITE_CREATED_LIST_URL,
+            params=params,
+            headers={"Referer": f"https://space.bilibili.com/{user_mid}/favlist"},
+        )
+        data = payload.get("data") or {}
+        raw_items = data.get("list") or []
+        return {
+            "mid": str(user_mid),
+            "page": max(page, 1),
+            "limit": limit,
+            "total": data.get("count"),
+            "has_more": bool(data.get("has_more")),
+            "items": [_normalize_favorite_folder(item) for item in raw_items[:limit]],
+        }
+
+    def _relation_list(self, mid: str | int, *, relation: str, limit: int, page: int) -> dict[str, Any]:
+        user_mid = _normalize_mid(mid)
+        url = constants.RELATION_FOLLOWINGS_URL if relation == "following" else constants.RELATION_FOLLOWERS_URL
+        params = {
+            "vmid": user_mid,
+            "pn": max(page, 1),
+            "ps": min(max(limit, 1), 50),
+            "order_type": "attention",
+        }
+        payload = self.get_json(
+            url,
+            params=params,
+            headers={"Referer": f"https://space.bilibili.com/{user_mid}/relation/{'follow' if relation == 'following' else 'fans'}"},
+        )
+        data = payload.get("data") or {}
+        raw_items = data.get("list") or []
+        return {
+            "mid": str(user_mid),
+            "relation": relation,
+            "page": max(page, 1),
+            "limit": limit,
+            "total": data.get("total"),
+            "items": [_normalize_relation_user(item) for item in raw_items[:limit]],
+        }
+
+    def _optional_data(
+        self,
+        url: str,
+        *,
+        params: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
+        try:
+            payload = self.get_json(url, params=params, headers=headers)
+        except BiliError:
+            return {}
+        data = payload.get("data") or {}
+        return data if isinstance(data, dict) else {}
+
 
 def _video_params(ref: VideoRef) -> dict[str, Any]:
     if ref.bvid:
@@ -329,6 +482,22 @@ def _video_params(ref: VideoRef) -> dict[str, Any]:
     if ref.aid is not None:
         return {"aid": ref.aid}
     return {"bvid": ref.raw}
+
+
+def _normalize_mid(value: str | int) -> int:
+    text = str(value).strip()
+    if not text.isdigit():
+        raise APIError(f"Unsupported user mid: {value}", "UNSUPPORTED_INPUT")
+    return int(text)
+
+
+def _quality_to_qn(value: str | int) -> int:
+    if isinstance(value, int):
+        return value
+    text = str(value).lower()
+    if text.isdigit():
+        return int(text)
+    return constants.QUALITY_MAP.get(text, 127)
 
 
 def _normalize_search_item(item: dict[str, Any], search_type: str) -> dict[str, Any]:
@@ -408,6 +577,119 @@ def _normalize_video_card(item: dict[str, Any]) -> dict[str, Any]:
             "like": stat.get("like"),
         },
         "url": video_url(item.get("bvid"), item.get("aid")),
+    }
+
+
+def _normalize_user_info(
+    data: dict[str, Any],
+    *,
+    relation: dict[str, Any],
+    navnum: dict[str, Any],
+    setting: dict[str, Any],
+    mid: int,
+) -> dict[str, Any]:
+    card = data.get("card") or {}
+    official_verify = card.get("official_verify") or {}
+    official_detail = card.get("Official") or {}
+    level = card.get("level_info") or {}
+    vip = card.get("vip") or {}
+    return {
+        "mid": str(card.get("mid") or mid),
+        "name": card.get("name") or "",
+        "sex": card.get("sex") or "",
+        "face": card.get("face") or "",
+        "sign": card.get("sign") or "",
+        "url": f"https://space.bilibili.com/{card.get('mid') or mid}",
+        "level": level.get("current_level"),
+        "vip": {
+            "type": vip.get("type"),
+            "status": vip.get("status"),
+            "label": (vip.get("label") or {}).get("text"),
+        },
+        "official": {
+            "type": official_verify.get("type", official_detail.get("type")),
+            "role": official_detail.get("role"),
+            "title": official_detail.get("title") or official_verify.get("desc") or "",
+            "desc": official_verify.get("desc") or official_detail.get("desc") or "",
+        },
+        "counts": {
+            "following": relation.get("following") or card.get("attention") or card.get("friend"),
+            "followers": relation.get("follower") or data.get("follower") or card.get("fans"),
+            "archive": data.get("archive_count"),
+            "article": data.get("article_count"),
+            "likes": data.get("like_num"),
+            "video": navnum.get("video"),
+            "favorite_master": (navnum.get("favourite") or {}).get("master"),
+            "favorite_guest": (navnum.get("favourite") or {}).get("guest"),
+            "bangumi": navnum.get("bangumi"),
+            "cinema": navnum.get("cinema"),
+            "album": navnum.get("album"),
+            "audio": navnum.get("audio"),
+            "opus": navnum.get("opus"),
+        },
+        "privacy": setting.get("privacy") or {},
+    }
+
+
+def _normalize_space_video(item: dict[str, Any]) -> dict[str, Any]:
+    bvid = item.get("bvid")
+    aid = item.get("aid")
+    return {
+        "type": "video",
+        "bvid": bvid,
+        "aid": aid,
+        "title": _clean(item.get("title")),
+        "author": _clean(item.get("author")),
+        "mid": item.get("mid"),
+        "play": item.get("play"),
+        "comment": item.get("comment"),
+        "danmaku": item.get("video_review"),
+        "duration": item.get("length"),
+        "created": item.get("created"),
+        "description": _clean(item.get("description")),
+        "pic": item.get("pic"),
+        "url": item.get("arcurl") or video_url(bvid, aid),
+    }
+
+
+def _normalize_relation_user(item: dict[str, Any]) -> dict[str, Any]:
+    mid = item.get("mid")
+    official = item.get("official_verify") or {}
+    vip = item.get("vip") or {}
+    return {
+        "type": "user",
+        "mid": str(mid) if mid is not None else "",
+        "name": item.get("uname") or item.get("name") or "",
+        "uname": item.get("uname") or item.get("name") or "",
+        "face": item.get("face") or "",
+        "sign": item.get("sign") or "",
+        "level": item.get("level"),
+        "mtime": item.get("mtime"),
+        "official": {
+            "type": official.get("type"),
+            "desc": official.get("desc") or "",
+        },
+        "vip": {
+            "type": vip.get("vipType") or vip.get("type"),
+            "status": vip.get("vipStatus") or vip.get("status"),
+        },
+        "url": f"https://space.bilibili.com/{mid}" if mid else "",
+    }
+
+
+def _normalize_favorite_folder(item: dict[str, Any]) -> dict[str, Any]:
+    folder_id = item.get("id") or item.get("fid")
+    return {
+        "type": "favorite_folder",
+        "id": folder_id,
+        "fid": folder_id,
+        "mid": item.get("mid"),
+        "title": item.get("title") or "",
+        "media_count": item.get("media_count"),
+        "fav_state": item.get("fav_state"),
+        "attr": item.get("attr"),
+        "cover": item.get("cover") or "",
+        "url": f"https://space.bilibili.com/{item.get('mid')}/favlist?fid={folder_id}" if item.get("mid") and folder_id else "",
     }
 
 
