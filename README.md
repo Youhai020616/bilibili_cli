@@ -49,6 +49,13 @@ bili user followers <mid> --limit 20
 bili user following <mid> --limit 20
 bili user favorites <mid> --limit 20
 bili profile <mid> --videos --followers --limit 5
+bili like BVxxxx
+bili coin BVxxxx --count 1
+bili favorite folders
+bili favorite add BVxxxx --folder <folder_id>
+bili watchlater add BVxxxx
+bili follow <mid>
+bili comment post BVxxxx "comment text"
 bili trending --source popular --count 20
 
 bili account list
@@ -69,6 +76,8 @@ CLI commands
 Read-heavy commands use Bilibili web APIs first. Login and browser-only flows use Playwright. Write actions are planned behind dry-run and confirmation gates.
 
 Some space list endpoints may require a valid logged-in session or manual risk verification. Profile summary data uses public API surfaces where available and returns structured section errors when optional profile sections are blocked.
+
+Write commands are dry-run by default and write an audit event under `~/.bili/audit/`. Add `--yes` only when you intentionally want to execute the action with a valid logged-in Bilibili session.
 
 ## Local State
 

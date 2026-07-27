@@ -28,6 +28,8 @@ class AliasGroup(click.Group):
         "stat": "status",
         "u": "user",
         "p": "profile",
+        "fav": "favorite",
+        "wl": "watchlater",
     }
 
     def get_command(self, ctx: click.Context, cmd_name: str):
@@ -54,6 +56,7 @@ from bili_cli.commands.config_cmd import config_group
 from bili_cli.commands.danmaku import danmaku
 from bili_cli.commands.download import download
 from bili_cli.commands.init import doctor, init
+from bili_cli.commands.interact import coin, comment_group, favorite_group, follow, like, watchlater_group
 from bili_cli.commands.search import search
 from bili_cli.commands.trending import trending
 from bili_cli.commands.user import profile, user_group
@@ -78,6 +81,12 @@ cli.add_command(download)
 cli.add_command(trending)
 cli.add_command(user_group, "user")
 cli.add_command(profile)
+cli.add_command(like)
+cli.add_command(coin)
+cli.add_command(follow)
+cli.add_command(favorite_group, "favorite")
+cli.add_command(watchlater_group, "watchlater")
+cli.add_command(comment_group, "comment")
 
 
 def main() -> None:

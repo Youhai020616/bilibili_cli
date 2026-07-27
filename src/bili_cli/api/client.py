@@ -14,8 +14,8 @@ import httpx
 
 from bili_cli import constants
 from bili_cli.config import load_config
-from bili_cli.errors import APIError, BiliError, CaptchaRequiredError, map_api_code
-from bili_cli.session import account_name, cookie_header
+from bili_cli.errors import APIError, BiliError, CaptchaRequiredError, LoginRequiredError, map_api_code
+from bili_cli.session import account_name, cookie_header, csrf_token
 from bili_cli.utils.ids import VideoRef, parse_video_ref, video_url
 
 
@@ -120,6 +120,49 @@ class BiliAPIClient:
             except ValueError as exc:
                 raise APIError("Invalid JSON response", "API_SCHEMA_CHANGED", True) from exc
 
+            if isinstance(payload, dict) and payload.get("code", 0) != 0:
+                api_code = int(payload.get("code") or 0)
+                message = str(payload.get("message") or payload.get("msg") or "")
+                raise map_api_code(api_code, message)
+            if not isinstance(payload, dict):
+                raise APIError("Unexpected API response type", "API_SCHEMA_CHANGED", True)
+            return payload
+
+        raise APIError(str(last_error or "Request failed"), "NETWORK_ERROR", True)
+
+    def post_json(
+        self,
+        url: str,
+        *,
+        data: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
+        last_error: Exception | None = None
+        for attempt in range(max(1, self.retries)):
+            self._delay()
+            try:
+                resp = self.client.post(url, data=data, headers=headers)
+                self._last_request_time = time.time()
+            except httpx.HTTPError as exc:
+                last_error = exc
+                if attempt + 1 < self.retries:
+                    time.sleep(2**attempt)
+                    continue
+                raise APIError(str(exc), "NETWORK_ERROR", True) from exc
+
+            if resp.status_code in {403, 412}:
+                raise CaptchaRequiredError(f"HTTP {resp.status_code} risk verification response")
+            if resp.status_code in {429, 500, 502, 503, 504} and attempt + 1 < self.retries:
+                time.sleep(2**attempt + random.uniform(0, 0.5))
+                continue
+
+            text = resp.text.lstrip()
+            if text.startswith("<!DOCTYPE html") or text.startswith("<html"):
+                raise CaptchaRequiredError("HTML response returned instead of JSON")
+            try:
+                payload = resp.json()
+            except ValueError as exc:
+                raise APIError("Invalid JSON response", "API_SCHEMA_CHANGED", True) from exc
             if isinstance(payload, dict) and payload.get("code", 0) != 0:
                 api_code = int(payload.get("code") or 0)
                 message = str(payload.get("message") or payload.get("msg") or "")
@@ -436,6 +479,105 @@ class BiliAPIClient:
             "items": [_normalize_favorite_folder(item) for item in raw_items[:limit]],
         }
 
+    def favorite_folders(self, *, limit: int = 50, page: int = 1) -> dict[str, Any]:
+        status = self.status()
+        if not status.get("is_login") or not status.get("mid"):
+            raise LoginRequiredError("Login is required to list your favorite folders")
+        return self.user_favorites(status["mid"], limit=limit, page=page)
+
+    def like_video(self, video_id: str, *, unlike: bool = False) -> dict[str, Any]:
+        token = self._require_write_session()
+        detail = self.video_detail(video_id)
+        payload = self.post_json(
+            constants.ARCHIVE_LIKE_URL,
+            data={"aid": detail.get("aid"), "like": 2 if unlike else 1, "csrf": token},
+            headers={"Referer": video_url(detail.get("bvid"), detail.get("aid"))},
+        )
+        return {"action": "unlike" if unlike else "like", "video": _video_summary(detail), "data": payload.get("data")}
+
+    def coin_video(self, video_id: str, *, count: int = 1, select_like: bool = False) -> dict[str, Any]:
+        token = self._require_write_session()
+        detail = self.video_detail(video_id)
+        payload = self.post_json(
+            constants.COIN_ADD_URL,
+            data={
+                "aid": detail.get("aid"),
+                "multiply": min(max(count, 1), 2),
+                "select_like": 1 if select_like else 0,
+                "csrf": token,
+            },
+            headers={"Referer": video_url(detail.get("bvid"), detail.get("aid"))},
+        )
+        return {"action": "coin", "video": _video_summary(detail), "data": payload.get("data")}
+
+    def favorite_video(self, video_id: str, *, folder_id: str | int, remove: bool = False) -> dict[str, Any]:
+        token = self._require_write_session()
+        detail = self.video_detail(video_id)
+        media_key = "del_media_ids" if remove else "add_media_ids"
+        payload = self.post_json(
+            constants.FAVORITE_DEAL_URL,
+            data={
+                "rid": detail.get("aid"),
+                "type": 2,
+                media_key: str(folder_id),
+                "csrf": token,
+            },
+            headers={"Referer": video_url(detail.get("bvid"), detail.get("aid"))},
+        )
+        return {"action": "favorite.remove" if remove else "favorite.add", "video": _video_summary(detail), "folder_id": str(folder_id), "data": payload.get("data")}
+
+    def watchlater_add(self, video_id: str) -> dict[str, Any]:
+        token = self._require_write_session()
+        detail = self.video_detail(video_id)
+        payload = self.post_json(
+            constants.WATCHLATER_ADD_URL,
+            data={"aid": detail.get("aid"), "csrf": token},
+            headers={"Referer": video_url(detail.get("bvid"), detail.get("aid"))},
+        )
+        return {"action": "watchlater.add", "video": _video_summary(detail), "data": payload.get("data")}
+
+    def follow_user(self, mid: str | int, *, unfollow: bool = False) -> dict[str, Any]:
+        token = self._require_write_session()
+        user_mid = _normalize_mid(mid)
+        payload = self.post_json(
+            constants.RELATION_MODIFY_URL,
+            data={"fid": user_mid, "act": 2 if unfollow else 1, "re_src": 11, "csrf": token},
+            headers={"Referer": f"https://space.bilibili.com/{user_mid}/"},
+        )
+        return {"action": "unfollow" if unfollow else "follow", "mid": str(user_mid), "data": payload.get("data")}
+
+    def comment_post(
+        self,
+        video_id: str,
+        message: str,
+        *,
+        root: str | int | None = None,
+        parent: str | int | None = None,
+    ) -> dict[str, Any]:
+        token = self._require_write_session()
+        detail = self.video_detail(video_id)
+        data: dict[str, Any] = {"type": 1, "oid": detail.get("aid"), "message": message, "csrf": token}
+        if root:
+            data["root"] = root
+        if parent:
+            data["parent"] = parent
+        payload = self.post_json(
+            constants.COMMENT_ADD_URL,
+            data=data,
+            headers={"Referer": video_url(detail.get("bvid"), detail.get("aid"))},
+        )
+        return {"action": "comment.post", "video": _video_summary(detail), "reply": _normalize_comment(payload.get("data") or {})}
+
+    def comment_delete(self, video_id: str, *, rpid: str | int) -> dict[str, Any]:
+        token = self._require_write_session()
+        detail = self.video_detail(video_id)
+        payload = self.post_json(
+            constants.COMMENT_DELETE_URL,
+            data={"type": 1, "oid": detail.get("aid"), "rpid": rpid, "csrf": token},
+            headers={"Referer": video_url(detail.get("bvid"), detail.get("aid"))},
+        )
+        return {"action": "comment.delete", "video": _video_summary(detail), "rpid": str(rpid), "data": payload.get("data")}
+
     def _relation_list(self, mid: str | int, *, relation: str, limit: int, page: int) -> dict[str, Any]:
         user_mid = _normalize_mid(mid)
         url = constants.RELATION_FOLLOWINGS_URL if relation == "following" else constants.RELATION_FOLLOWERS_URL
@@ -474,6 +616,15 @@ class BiliAPIClient:
             return {}
         data = payload.get("data") or {}
         return data if isinstance(data, dict) else {}
+
+    def _require_write_session(self) -> str:
+        token = csrf_token(self.account)
+        if not token:
+            raise LoginRequiredError()
+        status = self.status()
+        if not status.get("is_login"):
+            raise LoginRequiredError()
+        return token
 
 
 def _video_params(ref: VideoRef) -> dict[str, Any]:

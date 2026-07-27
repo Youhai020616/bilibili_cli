@@ -22,6 +22,13 @@ RELATION_STAT_URL = f"{API_DOMAIN}/x/relation/stat"
 RELATION_FOLLOWERS_URL = f"{API_DOMAIN}/x/relation/followers"
 RELATION_FOLLOWINGS_URL = f"{API_DOMAIN}/x/relation/followings"
 FAVORITE_CREATED_LIST_URL = f"{API_DOMAIN}/x/v3/fav/folder/created/list"
+ARCHIVE_LIKE_URL = f"{API_DOMAIN}/x/web-interface/archive/like"
+COIN_ADD_URL = f"{API_DOMAIN}/x/web-interface/coin/add"
+FAVORITE_DEAL_URL = f"{API_DOMAIN}/x/v3/fav/resource/deal"
+WATCHLATER_ADD_URL = f"{API_DOMAIN}/x/v2/history/toview/add"
+RELATION_MODIFY_URL = f"{API_DOMAIN}/x/relation/modify"
+COMMENT_ADD_URL = f"{API_DOMAIN}/x/v2/reply/add"
+COMMENT_DELETE_URL = f"{API_DOMAIN}/x/v2/reply/del"
 
 DEFAULT_USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
