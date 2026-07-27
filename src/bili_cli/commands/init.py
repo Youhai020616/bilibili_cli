@@ -36,6 +36,7 @@ def doctor(as_json: bool) -> None:
         {"name": "httpx", "ok": _has_module("httpx"), "detail": ""},
         {"name": "yaml", "ok": _has_module("yaml"), "detail": ""},
         {"name": "playwright", "ok": _has_module("playwright"), "detail": ""},
+        {"name": "browser_cookie3", "ok": _has_module("browser_cookie3"), "detail": ""},
         {"name": "ffmpeg", "ok": bool(ffmpeg_path()), "detail": ffmpeg_path() or "not found"},
         {"name": "default_account", "ok": True, "detail": default_account()},
         {"name": "session", "ok": has_session(default_account()), "detail": "saved" if has_session(default_account()) else "missing"},

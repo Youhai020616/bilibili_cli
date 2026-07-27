@@ -26,6 +26,7 @@ bili trending --count 10
 
 ```bash
 bili login
+bili login --browser --browser-name chrome
 bili status
 bili me
 bili logout

@@ -25,6 +25,7 @@ bili trending --count 20 --json
 
 ```bash
 bili login
+bili login --browser
 bili status --json
 bili me --json
 bili browser open
